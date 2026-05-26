@@ -1,25 +1,154 @@
-import logo from './logo.svg';
+import { useState, useEffect, useRef } from 'react';
 import './App.css';
+import ListPage from './ListPage';
+import CalendarPage from './CalendarPage';
+import { initAuth, signIn, signOut, isSignedIn, loadTransactions, saveTransactions } from './googleDrive';
 
-function App() {
+const today = () => new Date().toISOString().slice(0, 10);
+
+const SAMPLE_DATA = [
+  { id: 1, date: '2026-05-20', type: 'income', category: '급여', description: '5월 급여', amount: 3000000 },
+  { id: 2, date: '2026-05-22', type: 'expense', category: '식비', description: '점심식사', amount: 12000 },
+  { id: 3, date: '2026-05-24', type: 'expense', category: '교통', description: '지하철', amount: 1500 },
+];
+
+export default function App() {
+  const [transactions, setTransactions] = useState(SAMPLE_DATA);
+  const [tab, setTab] = useState('list');
+  const [filterMonth, setFilterMonth] = useState(today().slice(0, 7));
+
+  const [authState, setAuthState] = useState('idle'); // 'idle' | 'loading' | 'signed-in' | 'error'
+  const [syncState, setSyncState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
+  const isLoaded = useRef(false); // Drive에서 데이터를 불러온 뒤에만 자동 저장
+
+  // Google Auth 초기화
+  useEffect(() => {
+    initAuth().catch(() => setAuthState('error'));
+  }, []);
+
+  // 로그인
+  const handleSignIn = async () => {
+    setAuthState('loading');
+    try {
+      await signIn();
+      setAuthState('signed-in');
+      setSyncState('saving');
+      const data = await loadTransactions();
+      if (data) {
+        setTransactions(data);
+      }
+      isLoaded.current = true;
+      setSyncState('saved');
+    } catch {
+      setAuthState('error');
+    }
+  };
+
+  // 로그아웃
+  const handleSignOut = () => {
+    signOut();
+    setAuthState('idle');
+    setSyncState('idle');
+    isLoaded.current = false;
+    setTransactions(SAMPLE_DATA);
+  };
+
+  // 거래 변경 시 자동 저장
+  useEffect(() => {
+    if (!isLoaded.current || !isSignedIn()) return;
+
+    setSyncState('saving');
+    const timer = setTimeout(async () => {
+      try {
+        await saveTransactions(transactions);
+        setSyncState('saved');
+      } catch {
+        setSyncState('error');
+      }
+    }, 800); // 연속 입력 시 디바운스
+
+    return () => clearTimeout(timer);
+  }, [transactions]);
+
+  const handleAdd = (data) => {
+    setTransactions((prev) => [...prev, { id: Date.now(), ...data }]);
+  };
+
+  const handleDelete = (id) => {
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
+    <div className="app">
+      <header className="header">
+        <h1>가계부</h1>
+        <div className="header-right">
+          {tab === 'list' && (
+            <input
+              type="month"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="month-picker"
+            />
+          )}
+          <AuthButton
+            authState={authState}
+            syncState={syncState}
+            onSignIn={handleSignIn}
+            onSignOut={handleSignOut}
+          />
+        </div>
       </header>
+
+      <div className="tabs">
+        <button className={`tab-btn ${tab === 'list' ? 'active' : ''}`} onClick={() => setTab('list')}>
+          목록
+        </button>
+        <button className={`tab-btn ${tab === 'calendar' ? 'active' : ''}`} onClick={() => setTab('calendar')}>
+          달력
+        </button>
+      </div>
+
+      {tab === 'list' && (
+        <ListPage
+          transactions={transactions}
+          onAdd={handleAdd}
+          onDelete={handleDelete}
+          filterMonth={filterMonth}
+          onFilterMonthChange={setFilterMonth}
+        />
+      )}
+
+      {tab === 'calendar' && (
+        <CalendarPage transactions={transactions} />
+      )}
     </div>
   );
 }
 
-export default App;
+function AuthButton({ authState, syncState, onSignIn, onSignOut }) {
+  if (authState === 'signed-in') {
+    return (
+      <div className="auth-area">
+        <span className={`sync-status ${syncState}`}>
+          {syncState === 'saving' && '저장 중...'}
+          {syncState === 'saved' && '✓ 저장됨'}
+          {syncState === 'error' && '⚠ 저장 실패'}
+        </span>
+        <button className="btn-auth signout" onClick={onSignOut}>
+          로그아웃
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      className="btn-auth signin"
+      onClick={onSignIn}
+      disabled={authState === 'loading'}
+    >
+      {authState === 'loading' ? '연결 중...' : 'Google Drive 연결'}
+    </button>
+  );
+}
