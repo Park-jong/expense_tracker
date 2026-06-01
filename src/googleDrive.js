@@ -2,6 +2,7 @@ const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const FILE_NAME = '가계부.csv';
+const STORAGE_KEY = 'gd_token';
 
 let tokenClient = null;
 let accessToken = null;
@@ -19,7 +20,7 @@ function loadGIS() {
   });
 }
 
-// 인증 초기화
+// 인증 초기화 + sessionStorage에서 토큰 복원
 export async function initAuth() {
   await loadGIS();
   tokenClient = window.google.accounts.oauth2.initTokenClient({
@@ -27,6 +28,18 @@ export async function initAuth() {
     scope: SCOPES,
     callback: () => { },
   });
+
+  const stored = sessionStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    const { token, expiresAt } = JSON.parse(stored);
+    if (Date.now() < expiresAt) {
+      accessToken = token;
+      tokenExpiresAt = expiresAt;
+      return true;
+    }
+    sessionStorage.removeItem(STORAGE_KEY);
+  }
+  return false;
 }
 
 // 로그인 - 액세스 토큰 요청 (첫 로그인은 동의 화면, 이후엔 자동)
@@ -36,6 +49,7 @@ export function signIn() {
       if (response.error) return reject(response);
       accessToken = response.access_token;
       tokenExpiresAt = Date.now() + (response.expires_in ?? 3600) * 1000;
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ token: accessToken, expiresAt: tokenExpiresAt }));
       resolve(accessToken);
     };
     tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
@@ -49,6 +63,7 @@ export function signOut() {
   }
   accessToken = null;
   tokenExpiresAt = 0;
+  sessionStorage.removeItem(STORAGE_KEY);
 }
 
 export function isSignedIn() {

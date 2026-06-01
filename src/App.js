@@ -15,9 +15,28 @@ export default function App() {
   const [syncState, setSyncState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const isLoaded = useRef(false); // Drive에서 데이터를 불러온 뒤에만 자동 저장
 
-  // Google Auth 초기화
+  // Google Auth 초기화 + 세션 복원
   useEffect(() => {
-    initAuth().catch(() => setAuthState('error'));
+    setAuthState('loading');
+    initAuth()
+      .then(async (autoSignedIn) => {
+        if (!autoSignedIn) {
+          setAuthState('idle');
+          return;
+        }
+        setAuthState('signed-in');
+        setSyncState('saving');
+        try {
+          const data = await loadTransactions();
+          if (data) setTransactions(data);
+          isLoaded.current = true;
+          setSyncState('saved');
+        } catch {
+          isLoaded.current = true;
+          setSyncState('error');
+        }
+      })
+      .catch(() => setAuthState('error'));
   }, []);
 
   // 로그인
