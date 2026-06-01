@@ -6,14 +6,8 @@ import { initAuth, signIn, signOut, isSignedIn, loadTransactions, saveTransactio
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-const SAMPLE_DATA = [
-  { id: 1, date: '2026-05-20', type: 'income', category: '급여', description: '5월 급여', amount: 3000000 },
-  { id: 2, date: '2026-05-22', type: 'expense', category: '식비', description: '점심식사', amount: 12000 },
-  { id: 3, date: '2026-05-24', type: 'expense', category: '교통', description: '지하철', amount: 1500 },
-];
-
 export default function App() {
-  const [transactions, setTransactions] = useState(SAMPLE_DATA);
+  const [transactions, setTransactions] = useState([]);
   const [tab, setTab] = useState('list');
   const [filterMonth, setFilterMonth] = useState(today().slice(0, 7));
 
@@ -31,16 +25,20 @@ export default function App() {
     setAuthState('loading');
     try {
       await signIn();
-      setAuthState('signed-in');
-      setSyncState('saving');
+    } catch {
+      setAuthState('error');
+      return;
+    }
+    setAuthState('signed-in');
+    setSyncState('saving');
+    try {
       const data = await loadTransactions();
-      if (data) {
-        setTransactions(data);
-      }
+      if (data) setTransactions(data);
       isLoaded.current = true;
       setSyncState('saved');
     } catch {
-      setAuthState('error');
+      isLoaded.current = true;
+      setSyncState('error');
     }
   };
 
@@ -50,7 +48,7 @@ export default function App() {
     setAuthState('idle');
     setSyncState('idle');
     isLoaded.current = false;
-    setTransactions(SAMPLE_DATA);
+    setTransactions([]);
   };
 
   // 거래 변경 시 자동 저장
@@ -142,13 +140,13 @@ function AuthButton({ authState, syncState, onSignIn, onSignOut }) {
     );
   }
 
+  if (authState === 'loading') {
+    return <button className="btn-auth signin" disabled>연결 중...</button>;
+  }
+
   return (
-    <button
-      className="btn-auth signin"
-      onClick={onSignIn}
-      disabled={authState === 'loading'}
-    >
-      {authState === 'loading' ? '연결 중...' : 'Google Drive 연결'}
+    <button className="btn-auth signin" onClick={onSignIn}>
+      Google Drive 연결
     </button>
   );
 }

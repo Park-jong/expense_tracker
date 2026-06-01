@@ -1,10 +1,11 @@
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const FILE_NAME = '가계부.csv';
 
 let tokenClient = null;
 let accessToken = null;
+let tokenExpiresAt = 0;
 
 // Google Identity Services 스크립트 동적 로드
 function loadGIS() {
@@ -28,15 +29,16 @@ export async function initAuth() {
   });
 }
 
-// 로그인 - 액세스 토큰 요청
+// 로그인 - 액세스 토큰 요청 (첫 로그인은 동의 화면, 이후엔 자동)
 export function signIn() {
   return new Promise((resolve, reject) => {
     tokenClient.callback = (response) => {
       if (response.error) return reject(response);
       accessToken = response.access_token;
+      tokenExpiresAt = Date.now() + (response.expires_in ?? 3600) * 1000;
       resolve(accessToken);
     };
-    tokenClient.requestAccessToken({ prompt: 'consent' });
+    tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
   });
 }
 
@@ -46,10 +48,18 @@ export function signOut() {
     window.google.accounts.oauth2.revoke(accessToken);
   }
   accessToken = null;
+  tokenExpiresAt = 0;
 }
 
 export function isSignedIn() {
-  return !!accessToken;
+  return !!accessToken && Date.now() < tokenExpiresAt;
+}
+
+// 토큰 만료 시 재발급
+async function ensureToken() {
+  if (!isSignedIn()) {
+    await signIn();
+  }
 }
 
 // ── CSV 변환 유틸 ──────────────────────────────────────────
@@ -107,6 +117,7 @@ async function findFileId() {
 
 // Drive에서 거래 데이터 불러오기
 export async function loadTransactions() {
+  await ensureToken();
   const fileId = await findFileId();
   if (!fileId) return null; // 파일 없음 = 첫 실행
 
@@ -119,6 +130,7 @@ export async function loadTransactions() {
 
 // Drive에 거래 데이터 저장 (없으면 생성, 있으면 덮어쓰기)
 export async function saveTransactions(transactions) {
+  await ensureToken();
   const csvContent = toCSV(transactions);
   const fileId = await findFileId();
 
