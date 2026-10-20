@@ -1,11 +1,10 @@
 import { useState } from 'react';
+import { formatKRW, today } from './utils';
 
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
-const formatKRW = (amount) => amount.toLocaleString('ko-KR') + '원';
-
 export default function CalendarPage({ transactions }) {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = today();
   const [currentYear, setCurrentYear] = useState(Number(todayStr.slice(0, 4)));
   const [currentMonth, setCurrentMonth] = useState(Number(todayStr.slice(5, 7)));
   const [selectedDate, setSelectedDate] = useState(null);

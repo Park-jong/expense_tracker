@@ -1,13 +1,10 @@
 import { useState } from 'react';
+import { formatKRW, today } from './utils';
 
 const CATEGORIES = {
   income: ['급여', '부업', '투자', '기타수입'],
   expense: ['식비', '교통', '주거', '의료', '쇼핑', '문화', '기타지출'],
 };
-
-const formatKRW = (amount) => amount.toLocaleString('ko-KR') + '원';
-
-const today = () => new Date().toISOString().slice(0, 10);
 
 export default function ListPage({ transactions, onAdd, onDelete, filterMonth, onFilterMonthChange }) {
   const [form, setForm] = useState({

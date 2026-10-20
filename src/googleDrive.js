@@ -1,4 +1,6 @@
-const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+import { toCSV, parseCSV } from './csv';
+
+const CLIENT_ID =process.env.REACT_APP_GOOGLE_CLIENT_ID;
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const FILE_NAME = '가계부.csv';
@@ -75,35 +77,6 @@ async function ensureToken() {
   if (!isSignedIn()) {
     await signIn();
   }
-}
-
-// ── CSV 변환 유틸 ──────────────────────────────────────────
-
-function toCSV(transactions) {
-  const header = 'id,date,type,category,description,amount';
-  const rows = transactions.map((t) =>
-    [t.id, t.date, t.type, t.category, `"${t.description.replace(/"/g, '""')}"`, t.amount].join(',')
-  );
-  return [header, ...rows].join('\n');
-}
-
-function parseCSV(text) {
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) return [];
-  return lines.slice(1).map((line) => {
-    // description의 따옴표 처리
-    const match = line.match(/^([^,]+),([^,]+),([^,]+),([^,]+),"((?:[^"]|"")*)",(\d+)$/);
-    if (!match) return null;
-    const [, id, date, type, category, description, amount] = match;
-    return {
-      id: Number(id),
-      date,
-      type,
-      category,
-      description: description.replace(/""/g, '"'),
-      amount: Number(amount),
-    };
-  }).filter(Boolean);
 }
 
 // ── Drive API 호출 ──────────────────────────────────────────
