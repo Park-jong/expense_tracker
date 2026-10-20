@@ -7,7 +7,7 @@ Google Drive에 `가계부.csv` 파일로 데이터를 저장하기 때문에 �
 
 ## 주요 기능
 
-- **거래 내역 관리** : 날짜, 수입/지출 유형, 카테고리, 내용, 금액을 입력해 거래를 추가하고 삭제할 수 있습니다.
+- **거래 내역 관리** : 날짜, 수입/지출 유형, 카테고리, 내용, 금액을 입력해 거래를 추가하고 삭제할 수 있습니다. 로그인하지 않아도 이 기기(localStorage)에 저장되며, 로그인하면 Drive 데이터와 자동으로 병합됩니다.
 - **월별 요약** : 선택한 달의 수입 · 지출 · 잔액을 카드로 보여 줍니다.
 - **달력 보기** : 날짜별 수입/지출 합계를 달력에서 확인하고, 날짜를 누르면 해당 일의 상세 내역을 볼 수 있습니다.
 - **Google Drive 연동** : 로그인하면 Drive에 저장된 데이터를 불러오고, 변경 사항은 자동으로 저장됩니다.
@@ -84,8 +84,15 @@ npm run deploy   # GitHub Pages 배포 (gh-pages)
 
 ```
 src/
-├── App.js           # 앱 진입 컴포넌트 (탭, 인증, 자동 저장)
-├── ListPage.js      # 목록 화면 (요약, 거래 추가/삭제)
-├── CalendarPage.js  # 달력 화면
-└── googleDrive.js   # Google 로그인 및 Drive CSV 읽기/쓰기
+├── App.js                    # 앱 진입 컴포넌트 (탭, 인증, 자동 저장)
+├── ListPage.js               # 목록 화면 (요약, 거래 추가/삭제)
+├── CalendarPage.js           # 달력 화면
+├── googleDrive.js            # Google 로그인 및 Drive CSV 읽기/쓰기
+├── csv.js                    # 거래 내역 CSV 변환 (직렬화/파싱)
+├── guestStorage.js           # 비로그인 시 localStorage 저장 및 Drive 병합 지원
+├── utils.js                  # 날짜(로컬 기준) 등 공용 유틸 함수
+├── csv.test.js               # csv.js 단위 테스트
+├── guestStorage.test.js      # guestStorage.js 단위 테스트
+├── App.test.js               # 앱 스모크 테스트
+└── App.integration.test.js   # 비로그인 저장/Drive 병합 통합 테스트
 ```
