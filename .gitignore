@@ -22,3 +22,10 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# claude code
+/.claude/
+/agent-summaries/
+
+# 개인 작업 메모
+/TODO.md
