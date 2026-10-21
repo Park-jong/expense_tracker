@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import ListPage from './ListPage';
 import CalendarPage from './CalendarPage';
+import StatsPage from './StatsPage';
 import { initAuth, signIn, signOut, isSignedIn, loadTransactions, saveTransactions } from './googleDrive';
-import { today } from './utils';
+import { today, parseMonth } from './utils';
 import { loadGuestTransactions, saveGuestTransactions, clearGuestTransactions, mergeTransactions } from './guestStorage';
 
 export default function App() {
@@ -123,8 +124,23 @@ export default function App() {
     setTransactions((prev) => [...prev, { id: Date.now(), ...data }]);
   };
 
+  // 같은 id를 유지한 채 필드만 교체 (Drive/게스트 병합이 id 기준이므로)
+  const handleEdit = (id, data) => {
+    setTransactions((prev) => prev.map((t) => (t.id === id ? { ...data, id } : t)));
+  };
+
+  // 삭제 실행 취소: 이미 같은 id가 있으면 추가하지 않음
+  const handleRestore = (tx) => {
+    setTransactions((prev) => (prev.some((t) => t.id === tx.id) ? prev : [...prev, tx]));
+  };
+
   const handleDelete = (id) => {
     setTransactions((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // 월 선택기를 비우거나 형식이 올바르지 않으면 직전 월을 유지
+  const handleMonthPick = (e) => {
+    if (parseMonth(e.target.value)) setFilterMonth(e.target.value);
   };
 
   return (
@@ -136,7 +152,7 @@ export default function App() {
             <input
               type="month"
               value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
+              onChange={handleMonthPick}
               className="month-picker"
             />
           )}
@@ -158,20 +174,37 @@ export default function App() {
         <button className={`tab-btn ${tab === 'calendar' ? 'active' : ''}`} onClick={() => setTab('calendar')}>
           달력
         </button>
+        <button className={`tab-btn ${tab === 'stats' ? 'active' : ''}`} onClick={() => setTab('stats')}>
+          통계
+        </button>
       </div>
 
       {tab === 'list' && (
         <ListPage
           transactions={transactions}
           onAdd={handleAdd}
+          onEdit={handleEdit}
           onDelete={handleDelete}
+          onRestore={handleRestore}
           filterMonth={filterMonth}
           onFilterMonthChange={setFilterMonth}
         />
       )}
 
       {tab === 'calendar' && (
-        <CalendarPage transactions={transactions} />
+        <CalendarPage
+          transactions={transactions}
+          month={filterMonth}
+          onMonthChange={setFilterMonth}
+        />
+      )}
+
+      {tab === 'stats' && (
+        <StatsPage
+          transactions={transactions}
+          month={filterMonth}
+          onMonthChange={setFilterMonth}
+        />
       )}
     </div>
   );

@@ -192,3 +192,129 @@ test('(v) 로그아웃 후 Drive 데이터가 localStorage에 남지 않는다',
   const raw = localStorage.getItem(GUEST_KEY);
   expect(raw === null || !raw.includes('Drive전용')).toBe(true);
 });
+
+test('(viii) 비로그인 거래 수정이 같은 id 로 localStorage 에 반영된다', async () => {
+  localStorage.setItem(GUEST_KEY, JSON.stringify([tx(7, '점심', 9000)]));
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole('button', { name: '수정: 점심' }));
+  fireEvent.change(screen.getByPlaceholderText('거래 내용을 입력하세요'), { target: { value: '저녁' } });
+  fireEvent.change(screen.getByPlaceholderText('금액 (원)'), { target: { value: '12000' } });
+  fireEvent.click(screen.getByRole('button', { name: '수정 저장' }));
+
+  expect(await screen.findByText('저녁')).toBeInTheDocument();
+  await waitFor(() => expect(readGuest()).toHaveLength(1));
+  expect(readGuest()[0]).toMatchObject({ id: 7, description: '저녁', amount: 12000 });
+});
+
+test('(ix) 삭제 후 실행 취소하면 localStorage 에서 복원된다', async () => {
+  localStorage.setItem(GUEST_KEY, JSON.stringify([tx(7, '점심', 9000)]));
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole('button', { name: '삭제: 점심' }));
+  await waitFor(() => expect(readGuest()).toEqual([]));
+
+  fireEvent.click(screen.getByRole('button', { name: '실행 취소' }));
+  expect(await screen.findByText('점심')).toBeInTheDocument();
+  await waitFor(() => expect(readGuest()).toHaveLength(1));
+  expect(readGuest()[0]).toMatchObject({ id: 7, description: '점심', amount: 9000 });
+});
+
+// ---- 목록/달력 월 공유 ----
+const monthTx = (id, date, description) => ({
+  id, date, type: 'expense', category: '식비', description, amount: 1000,
+});
+
+const setMonth = (value) => {
+  fireEvent.change(document.querySelector('.month-picker'), { target: { value } });
+};
+
+// 날짜를 지정해 거래 추가
+const addTransactionOn = (date, description, amount) => {
+  fireEvent.click(screen.getByText('+ 거래 추가'));
+  fireEvent.change(document.querySelector('input[name="date"]'), { target: { value: date } });
+  fireEvent.change(screen.getByPlaceholderText('거래 내용을 입력하세요'), { target: { value: description } });
+  fireEvent.change(screen.getByPlaceholderText('금액 (원)'), { target: { value: String(amount) } });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+};
+
+test('(x) 목록에서 바꾼 월이 달력 탭에서도 유지된다', async () => {
+  localStorage.setItem(GUEST_KEY, JSON.stringify([monthTx(1, '2026-03-10', '삼월')]));
+  render(<App />);
+  setMonth('2026-03');
+  fireEvent.click(screen.getByRole('button', { name: '달력' }));
+  expect(screen.getByText('2026년 3월')).toBeInTheDocument();
+  await screen.findByText('이 기기에만 저장됨');
+});
+
+test('(xi) 달력에서 이전 달로 이동하면 목록 month-picker 도 같은 월이다', async () => {
+  render(<App />);
+  setMonth('2026-03');
+  fireEvent.click(screen.getByRole('button', { name: '달력' }));
+  fireEvent.click(screen.getByText('‹'));
+  expect(screen.getByText('2026년 2월')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '목록' }));
+  expect(document.querySelector('.month-picker').value).toBe('2026-02');
+  await screen.findByText('이 기기에만 저장됨');
+});
+
+test('(xii) 다른 달 날짜로 거래를 추가하면 그 달로 이동한다', async () => {
+  render(<App />);
+  setMonth('2026-03');
+  addTransactionOn('2026-05-20', '오월거래', 4000);
+
+  expect(await screen.findByText('오월거래')).toBeInTheDocument();
+  expect(document.querySelector('.month-picker').value).toBe('2026-05');
+});
+
+test('(xiii) 같은 달 날짜로 추가하면 월이 바뀌지 않는다', async () => {
+  render(<App />);
+  setMonth('2026-03');
+  addTransactionOn('2026-03-02', '삼월거래', 4000);
+
+  expect(await screen.findByText('삼월거래')).toBeInTheDocument();
+  expect(document.querySelector('.month-picker').value).toBe('2026-03');
+});
+
+test('(xiv) 거래를 다른 달 날짜로 수정하면 그 달로 이동한다', async () => {
+  localStorage.setItem(GUEST_KEY, JSON.stringify([monthTx(1, '2026-03-10', '삼월')]));
+  render(<App />);
+  setMonth('2026-03');
+  fireEvent.click(screen.getByRole('button', { name: '수정: 삼월' }));
+  fireEvent.change(document.querySelector('input[name="date"]'), { target: { value: '2026-07-01' } });
+  fireEvent.click(screen.getByRole('button', { name: '수정 저장' }));
+
+  expect(await screen.findByText('삼월')).toBeInTheDocument();
+  expect(document.querySelector('.month-picker').value).toBe('2026-07');
+});
+
+test('(xvi) 목록에서 정한 월이 통계 탭에 반영되고 통계에서 이동하면 목록도 같은 월이다', async () => {
+  localStorage.setItem(GUEST_KEY, JSON.stringify([monthTx(1, '2026-03-10', '삼월')]));
+  render(<App />);
+  setMonth('2026-03');
+  fireEvent.click(screen.getByRole('button', { name: '통계' }));
+  expect(screen.getByText('2026년 3월')).toBeInTheDocument();
+  expect(screen.getByText('식비')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByText('‹'));
+  expect(screen.getByText('2026년 2월')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '목록' }));
+  expect(document.querySelector('.month-picker').value).toBe('2026-02');
+  await screen.findByText('이 기기에만 저장됨');
+});
+
+test('(xv) month-picker 를 비워도 목록과 달력이 직전 월을 유지한다', async () => {
+  localStorage.setItem(GUEST_KEY, JSON.stringify([monthTx(1, '2026-03-10', '삼월'), monthTx(2, '2026-04-10', '사월')]));
+  render(<App />);
+  setMonth('2026-03');
+  expect(screen.getByText('삼월')).toBeInTheDocument();
+
+  setMonth('');
+  expect(document.querySelector('.month-picker').value).toBe('2026-03');
+  expect(screen.getByText('삼월')).toBeInTheDocument();
+  expect(screen.queryByText('사월')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '달력' }));
+  expect(screen.getByText('2026년 3월')).toBeInTheDocument();
+  await screen.findByText('이 기기에만 저장됨');
+});

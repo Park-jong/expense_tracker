@@ -1,24 +1,30 @@
-import { useState } from 'react';
-import { formatKRW, today } from './utils';
+import { useState, useEffect } from 'react';
+import { formatKRW, today, parseMonth, shiftMonth } from './utils';
 
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
-export default function CalendarPage({ transactions }) {
+export default function CalendarPage({ transactions, month, onMonthChange }) {
   const todayStr = today();
-  const [currentYear, setCurrentYear] = useState(Number(todayStr.slice(0, 4)));
-  const [currentMonth, setCurrentMonth] = useState(Number(todayStr.slice(5, 7)));
+  // month가 올바르지 않으면 오늘이 속한 달로 대체
+  const parsed = parseMonth(month) ?? parseMonth(todayStr.slice(0, 7));
+  const currentYear = parsed.year;
+  const currentMonth = parsed.month;
   const [selectedDate, setSelectedDate] = useState(null);
 
-  const prevMonth = () => {
-    if (currentMonth === 1) { setCurrentYear((y) => y - 1); setCurrentMonth(12); }
-    else setCurrentMonth((m) => m - 1);
-  };
-  const nextMonth = () => {
-    if (currentMonth === 12) { setCurrentYear((y) => y + 1); setCurrentMonth(1); }
-    else setCurrentMonth((m) => m + 1);
-  };
-
   const monthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+
+  // 월 이동 시 선택된 날짜는 초기화
+  const moveMonth = (delta) => {
+    setSelectedDate(null);
+    onMonthChange(shiftMonth(monthStr, delta));
+  };
+  const prevMonth = () => moveMonth(-1);
+  const nextMonth = () => moveMonth(1);
+
+  // 바깥(목록 탭 등)에서 월이 바뀌어도 선택 해제
+  useEffect(() => {
+    setSelectedDate(null);
+  }, [monthStr]);
 
   // 해당 월 거래 맵 { 'YYYY-MM-DD': { income, expense, items } }
   const dayMap = {};
