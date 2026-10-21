@@ -124,12 +124,13 @@ body {
 /* 요약 카드 */
 .summary {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 20px;
 }
 
 .card {
+  min-width: 0;
   background: #fff;
   border-radius: 14px;
   padding: 16px;
@@ -150,6 +151,7 @@ body {
 .card-amount {
   font-size: 1.1rem;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .income-card .card-amount { color: #2e7d32; }
@@ -250,8 +252,17 @@ body {
 
 .empty {
   text-align: center;
-  color: #aaa;
+  color: #6b6b6b;
   padding: 40px 0;
+  font-size: 0.95rem;
+}
+
+/* 예산 패널 빈 상태: 패널 안이라 여백을 줄임 */
+.budget-empty {
+  text-align: center;
+  color: #6b6b6b;
+  padding: 14px 0;
+  margin: 0;
   font-size: 0.95rem;
 }
 
@@ -259,9 +270,14 @@ body {
   background: #fff;
   border-radius: 12px;
   padding: 14px 16px;
-  display: flex;
+  /* 2열 grid: 왼쪽(날짜·카테고리·설명)은 줄어들 수 있고, 오른쪽(금액·버튼)은 자기 폭만큼 차지한다.
+     설명 열 최소 폭을 8ch 로 둬서 12자리 금액에서도 설명이 1px 로 눌리지 않는다. */
+  display: grid;
+  grid-template-columns: minmax(8ch, 1fr) auto;
+  column-gap: 12px;
   align-items: center;
-  justify-content: space-between;
+  max-width: 100%;
+  box-sizing: border-box;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
   border-left: 4px solid transparent;
   transition: box-shadow 0.15s;
@@ -287,10 +303,11 @@ body {
   min-width: 0;
 }
 
+/* 날짜는 한 줄 고정, 고정 min-width 를 두지 않고 자연 폭을 쓴다 */
 .tx-date {
   font-size: 0.8rem;
   color: #888;
-  min-width: 80px;
+  white-space: nowrap;
 }
 
 .tx-category {
@@ -312,10 +329,15 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-shrink: 0; /* 금액·버튼은 줄어들지 않고 설명(.tx-left)만 줄어든다 */
-  max-width: 100%; /* 극단적으로 넓을 때만 내부(금액 / 버튼)가 줄바꿈된다 */
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* 수정/삭제 버튼 묶음: 한 덩어리로 유지해 줄바꿈 시 함께 이동 */
+.tx-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .tx-amount {
@@ -465,7 +487,7 @@ body {
 /* 그리드 */
 .cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
 }
 
@@ -481,6 +503,7 @@ body {
 .cal-weekday.sat { color: #1565c0; }
 
 .cal-cell {
+  min-width: 0;
   background: #fff;
   border-radius: 10px;
   min-height: 76px;
@@ -534,12 +557,19 @@ body {
 }
 
 .cal-amounts {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
+/* 셀 합계: 넓은 화면은 전체 금액, 좁은 화면(≤ 600px)은 만·억 축약 표기 */
+.cal-amt-compact { display: none; }
+.cal-amt-full,
+.cal-amt-compact { white-space: nowrap; }
+
 .cal-income {
+  min-width: 0;
   font-size: 0.68rem;
   font-weight: 600;
   color: #2e7d32;
@@ -549,6 +579,7 @@ body {
 }
 
 .cal-expense {
+  min-width: 0;
   font-size: 0.68rem;
   font-weight: 600;
   color: #c62828;
@@ -589,7 +620,7 @@ body {
 
 .cal-detail-empty {
   text-align: center;
-  color: #bbb;
+  color: #6b6b6b;
   padding: 24px 0;
   font-size: 0.9rem;
 }
@@ -642,6 +673,27 @@ body {
 .cal-detail-item.expense .cal-detail-amount { color: #c62828; }
 
 /* 반응형 */
+/* 480px 이하: 2열이면 421~440px 부근에서 설명 열이 100px 안팎으로 좁아지고 420px 에서 421px 로 넘어갈 때
+   행 높이가 급변한다(실측). 아래 480px 블록(.tx-left 세로 쌓기)과 기준을 맞춰 1열로 쌓으면
+   금액과 설명이 서로 다른 줄이 되어 겹치지 않고 경계도 하나로 정리된다. */
+@media (max-width: 480px) {
+  .transaction-item {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+  }
+
+  .tx-right {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+}
+
+@media (max-width: 600px) {
+  .cal-amt-full { display: none; }
+  .cal-amt-compact { display: inline; }
+}
+
 @media (max-width: 480px) {
   .summary {
     grid-template-columns: 1fr;
@@ -661,6 +713,15 @@ body {
   .cal-income,
   .cal-expense {
     font-size: 0.6rem;
+  }
+}
+
+/* 아주 좁은 화면: 셀 폭이 약 37px 이라 글자만 살짝 줄임 (0.55rem 미만 금지) */
+@media (max-width: 360px) {
+  .cal-income,
+  .cal-expense {
+    font-size: 0.55rem;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -685,7 +746,15 @@ body {
 
 .stats-toolbar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px; /* 예산 패널과 시각적으로 분리 */
+}
+
+.stats-toolbar-label {
+  font-size: 0.8rem;
+  color: var(--stats-text-secondary);
 }
 
 .stats-toggle,
@@ -847,14 +916,9 @@ body {
   column-gap: 8px;
 }
 
-/* 항목(색 점 + 라벨 + 값)은 한 덩어리로 유지하고, '·' 구분자는 뒤 항목의 앞 장식으로 둔다 */
+/* 항목(색 점 + 라벨 + 값)은 한 덩어리로 유지하고, 구분은 column-gap 과 색 점만으로 한다 */
 .trend-summary .trend-item {
   white-space: nowrap;
-}
-
-.trend-summary .trend-item + .trend-item::before {
-  content: '·';
-  margin-right: 8px;
 }
 
 .trend-summary .legend-dot {
@@ -954,4 +1018,188 @@ body {
   margin: 0 0 10px;
   font-size: 0.88rem;
   color: #555;
+}
+
+/* ── 월 예산 (meter) ── */
+/* 채움이 심각도를 나타내고, 트랙은 같은 색 계열의 연한 단계. 텍스트는 데이터 색이 아닌 텍스트 토큰 색 */
+.stats-page {
+  --budget-ok-fill: #2a78d6;
+  --budget-ok-track: #cde2fb;
+  --budget-warn-fill: #fab219;
+  --budget-warn-track: #fdecc3;
+  --budget-over-fill: #d03b3b;
+  --budget-over-track: #f6d0d0;
+}
+
+.budget-sync {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  color: var(--stats-text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.budget-notice {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-left: 4px solid var(--budget-warn-fill);
+  background: var(--budget-warn-track);
+  color: var(--stats-text);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.budget-notice p { margin: 0 0 6px; }
+.budget-notice .budget-help { color: var(--stats-text-secondary); font-size: 0.8rem; }
+
+.budget-link-btn {
+  background: #fff;
+  color: #5c6bc0;
+  border: 1.5px solid #5c6bc0;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.budget-link-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.budget-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.budget-row {
+  --budget-fill: var(--budget-ok-fill);
+  --budget-track: var(--budget-ok-track);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.budget-row.warn { --budget-fill: var(--budget-warn-fill); --budget-track: var(--budget-warn-track); }
+.budget-row.over { --budget-fill: var(--budget-over-fill); --budget-track: var(--budget-over-track); }
+
+.budget-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.budget-name {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 0.85rem;
+  color: var(--stats-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.budget-amount {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  color: var(--stats-text);
+  white-space: nowrap;
+}
+
+.budget-meter {
+  width: 100%;
+  height: 12px;
+  background: var(--budget-track);
+  border-radius: 0 4px 4px 0; /* 시작(기준선)은 직각, 오른쪽 끝만 둥글림 */
+  overflow: hidden;
+}
+
+.budget-fill {
+  height: 100%;
+  background: var(--budget-fill);
+  border-radius: 0 4px 4px 0;
+}
+
+.budget-status {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--stats-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.budget-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 0 0 14px;
+}
+
+.budget-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.budget-field label {
+  font-size: 0.8rem;
+  color: var(--stats-text-secondary);
+}
+
+.budget-field input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1.5px solid #dde0ee;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.budget-field input[aria-invalid="true"] { border-color: var(--budget-over-fill); }
+
+.budget-error {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #a62a2a;
+}
+
+.budget-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 목록 탭 예산 알림 */
+.budget-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 14px;
+}
+
+.budget-alert {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 4px solid var(--alert-color);
+  background: var(--alert-bg);
+  border-radius: 0 6px 6px 0;
+  font-size: 0.88rem;
+  color: #1a1a2e;
+  overflow-wrap: anywhere;
+}
+
+.budget-alert.warn { --alert-color: #fab219; --alert-bg: #fdecc3; }
+.budget-alert.over { --alert-color: #d03b3b; --alert-bg: #f6d0d0; }
+
+@media (max-width: 480px) {
+  .budget-form { grid-template-columns: minmax(0, 1fr); }
 }

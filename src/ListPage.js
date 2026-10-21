@@ -1,10 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
+import { CATEGORIES } from './categories';
 import { formatKRW, today, monthOfDate, filterTransactions } from './utils';
-
-const CATEGORIES = {
-  income: ['급여', '부업', '투자', '기타수입'],
-  expense: ['식비', '교통', '주거', '의료', '쇼핑', '문화', '기타지출'],
-};
+import BudgetAlerts from './BudgetAlerts';
 
 const UNDO_MS = 6000; // 삭제 실행 취소 알림 표시 시간
 
@@ -22,7 +19,7 @@ const emptyForm = () => ({
   amount: '',
 });
 
-export default function ListPage({ transactions, onAdd, onEdit, onDelete, onRestore, filterMonth, onFilterMonthChange }) {
+export default function ListPage({ transactions, onAdd, onEdit, onDelete, onRestore, filterMonth, onFilterMonthChange, budgetApi }) {
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null); // 수정 중인 거래 id (null이면 추가 모드)
@@ -153,6 +150,8 @@ export default function ListPage({ transactions, onAdd, onEdit, onDelete, onRest
         </div>
       </section>
 
+      <BudgetAlerts transactions={transactions} month={filterMonth} budgetApi={budgetApi} />
+
       <div className="add-area">
         <button className="btn-add" onClick={handleToggleForm}>
           {showForm ? '취소' : '+ 거래 추가'}
@@ -266,20 +265,22 @@ export default function ListPage({ transactions, onAdd, onEdit, onDelete, onRest
                   <span className="tx-amount">
                     {t.type === 'income' ? '+' : '-'}{formatKRW(t.amount)}
                   </span>
-                  <button
-                    className="btn-edit"
-                    aria-label={`수정: ${t.description}`}
-                    onClick={() => handleEditStart(t)}
-                  >
-                    수정
-                  </button>
-                  <button
-                    className="btn-delete"
-                    aria-label={`삭제: ${t.description}`}
-                    onClick={() => handleDeleteClick(t)}
-                  >
-                    삭제
-                  </button>
+                  <div className="tx-actions">
+                    <button
+                      className="btn-edit"
+                      aria-label={`수정: ${t.description}`}
+                      onClick={() => handleEditStart(t)}
+                    >
+                      수정
+                    </button>
+                    <button
+                      className="btn-delete"
+                      aria-label={`삭제: ${t.description}`}
+                      onClick={() => handleDeleteClick(t)}
+                    >
+                      삭제
+                    </button>
+                  </div>
                 </div>
               </div>
             ))

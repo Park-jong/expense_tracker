@@ -91,9 +91,9 @@ test('데이터가 없으면 안내 문구를 보여 준다', () => {
   expect(screen.getByText('표시할 거래가 없습니다.')).toBeInTheDocument();
 });
 
-test('표로 보기를 누르면 금액이 포맷된 테이블이 보이고 다시 누르면 차트로 돌아온다', () => {
+test('차트를 표로 보기를 누르면 금액이 포맷된 테이블이 보이고 다시 누르면 차트로 돌아온다', () => {
   setup();
-  fireEvent.click(screen.getByRole('button', { name: '표로 보기 (차트의 숫자를 표로 확인)' }));
+  fireEvent.click(screen.getByRole('button', { name: '차트를 표로 보기 (차트의 숫자를 표로 확인)' }));
   const [catTable, trendTable] = screen.getAllByRole('table');
   expect(within(catTable).getByText('식비')).toBeInTheDocument();
   expect(within(catTable).getByText('87,500원')).toBeInTheDocument();
@@ -103,7 +103,7 @@ test('표로 보기를 누르면 금액이 포맷된 테이블이 보이고 다�
   expect(within(trendTable).getByText('50,000원')).toBeInTheDocument();
   expect(document.querySelector('.hbar-chart')).toBeNull();
 
-  fireEvent.click(screen.getByRole('button', { name: '차트로 보기' }));
+  fireEvent.click(screen.getByRole('button', { name: '차트로 돌아가기' }));
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
   expect(document.querySelector('.hbar-chart')).not.toBeNull();
 });
@@ -151,9 +151,9 @@ describe('시각 규범 보호', () => {
     setup();
     fireEvent.mouseEnter(document.querySelectorAll('.chart-hit')[5]);
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '표로 보기 (차트의 숫자를 표로 확인)' }));
+    fireEvent.click(screen.getByRole('button', { name: '차트를 표로 보기 (차트의 숫자를 표로 확인)' }));
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '차트로 보기' }));
+    fireEvent.click(screen.getByRole('button', { name: '차트로 돌아가기' }));
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
@@ -225,7 +225,7 @@ describe('시각 규범 보호', () => {
 
   test('표로 보기 버튼이 키보드 대체 수단임을 aria-label 로 알린다', () => {
     setup();
-    expect(screen.getByRole('button', { name: '표로 보기 (차트의 숫자를 표로 확인)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '차트를 표로 보기 (차트의 숫자를 표로 확인)' })).toBeInTheDocument();
   });
 
   test('0.1% 미만 비율은 <0.1% 로 표시한다', () => {

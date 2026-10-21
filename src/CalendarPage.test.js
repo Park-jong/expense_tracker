@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import CalendarPage from './CalendarPage';
+import { compactKRW } from './utils';
 
 const txs = [
   { id: 1, date: '2026-10-15', type: 'expense', category: '식비', description: '점심', amount: 8000 },
@@ -50,6 +51,31 @@ test('거래 합계가 날짜 셀에 표시된다', () => {
   expect(within(c).getByText('-8,000원')).toBeInTheDocument();
   // 다른 달 거래는 표시되지 않음
   expect(screen.queryByText('-5,000원')).not.toBeInTheDocument();
+});
+
+// 주의: jsdom 은 CSS 미디어쿼리를 적용하지 않으므로 어느 표기가 보이는지는 검증하지 않는다 (DOM 구조와 문구만 확인)
+test('합계 요소의 title/aria-label 은 전체 금액이다', () => {
+  setup();
+  const c = cell(15);
+  const income = c.querySelector('.cal-income');
+  const expense = c.querySelector('.cal-expense');
+  expect(income).toHaveAttribute('title', '수입 3,000,000원');
+  expect(income).toHaveAttribute('aria-label', '수입 3,000,000원');
+  expect(expense).toHaveAttribute('title', '지출 8,000원');
+  expect(expense).toHaveAttribute('aria-label', '지출 8,000원');
+});
+
+test('합계마다 전체 표기와 축약 표기 span 이 모두 있고 축약은 compactKRW 결과와 같다', () => {
+  setup();
+  const c = cell(15);
+  const income = c.querySelector('.cal-income');
+  const expense = c.querySelector('.cal-expense');
+  expect(income.querySelector('.cal-amt-full')).toHaveTextContent('+3,000,000원');
+  expect(income.querySelector('.cal-amt-compact')).toHaveTextContent('+' + compactKRW(3000000));
+  expect(income.querySelector('.cal-amt-compact').textContent).toBe('+300만');
+  expect(expense.querySelector('.cal-amt-full')).toHaveTextContent('-8,000원');
+  expect(expense.querySelector('.cal-amt-compact').textContent).toBe('-' + compactKRW(8000));
+  expect(expense.querySelector('.cal-amt-compact').textContent).toBe('-8,000');
 });
 
 test('날짜를 누르면 상세가 표시되고 다시 누르면 닫힌다', () => {

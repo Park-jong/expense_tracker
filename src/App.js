@@ -5,6 +5,7 @@ import CalendarPage from './CalendarPage';
 import StatsPage from './StatsPage';
 import { initAuth, signIn, signOut, isSignedIn, loadTransactions, saveTransactions } from './googleDrive';
 import { today, parseMonth } from './utils';
+import { useBudgets } from './useBudgets';
 import { loadGuestTransactions, saveGuestTransactions, clearGuestTransactions, mergeTransactions } from './guestStorage';
 
 export default function App() {
@@ -120,6 +121,8 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [transactions]);
 
+  const budgetApi = useBudgets(authState);
+
   const handleAdd = (data) => {
     setTransactions((prev) => [...prev, { id: Date.now(), ...data }]);
   };
@@ -188,6 +191,7 @@ export default function App() {
           onRestore={handleRestore}
           filterMonth={filterMonth}
           onFilterMonthChange={setFilterMonth}
+          budgetApi={budgetApi}
         />
       )}
 
@@ -204,6 +208,8 @@ export default function App() {
           transactions={transactions}
           month={filterMonth}
           onMonthChange={setFilterMonth}
+          authState={authState}
+          budgetApi={budgetApi}
         />
       )}
     </div>

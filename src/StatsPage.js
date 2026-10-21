@@ -4,6 +4,8 @@ import {
   categoryBreakdown, monthlyTrend, niceTicks, formatPercent,
 } from './stats';
 
+import BudgetPanel from './BudgetPanel';
+
 const TYPE_LABEL = { expense: '지출', income: '수입' };
 
 // 월별 추이 SVG 규격 (실제 픽셀 기준). 폭은 컨테이너 폭을 측정해 쓰고, 측정할 수 없으면 480
@@ -48,7 +50,7 @@ const useContainerWidth = (ref) => {
   return width;
 };
 
-export default function StatsPage({ transactions, month, onMonthChange }) {
+export default function StatsPage({ transactions, month, onMonthChange, authState, budgetApi }) {
   // month가 올바르지 않으면 오늘이 속한 달로 대체
   const parsed = parseMonth(month) ?? parseMonth(today().slice(0, 7));
   const monthStr = `${parsed.year}-${String(parsed.month).padStart(2, '0')}`;
@@ -96,18 +98,21 @@ export default function StatsPage({ transactions, month, onMonthChange }) {
         </div>
       </section>
 
+      <BudgetPanel transactions={transactions} month={monthStr} authState={authState} budgetApi={budgetApi} />
+
       <div className="stats-toolbar">
+        <span className="stats-toolbar-label">차트 보기 방식</span>
         <button
           type="button"
           className="stats-toggle"
           aria-pressed={tableView}
-          aria-label={tableView ? '차트로 보기' : '표로 보기 (차트의 숫자를 표로 확인)'}
+          aria-label={tableView ? '차트로 돌아가기' : '차트를 표로 보기 (차트의 숫자를 표로 확인)'}
           onClick={() => {
             setTooltip(null);
             setTableView((v) => !v);
           }}
         >
-          {tableView ? '차트로 보기' : '표로 보기'}
+          {tableView ? '차트로 돌아가기' : '차트를 표로 보기'}
         </button>
       </div>
 
@@ -307,7 +312,7 @@ function TrendChart({ trend, label, active, setActive }) {
               >
                 {Number(r.month.slice(5))}월
               </text>
-              {/* 호버 영역: 그룹 전체 칸(막대보다 넓음). 키보드 대체 수단은 '표로 보기' */}
+              {/* 호버 영역: 그룹 전체 칸(막대보다 넓음). 키보드 대체 수단은 '차트를 표로 보기' */}
               <rect
                 className="chart-hit"
                 x={padLeft + slot * i}

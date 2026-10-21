@@ -1,9 +1,11 @@
 import { toCSV, parseCSV } from './csv';
+import { parseBudgets, BudgetFileCorruptError } from './budget';
 
 const CLIENT_ID =process.env.REACT_APP_GOOGLE_CLIENT_ID;
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const FILE_NAME = '가계부.csv';
+const BUDGET_FILE_NAME = '가계부-예산.json';
 const STORAGE_KEY = 'gd_token';
 
 let tokenClient = null;
@@ -94,8 +96,8 @@ async function driveRequest(url, options = {}) {
 }
 
 // 기존 파일 ID 검색
-async function findFileId() {
-  const q = encodeURIComponent(`name='${FILE_NAME}' and trashed=false`);
+async function findFileId(name = FILE_NAME) {
+  const q = encodeURIComponent(`name='${name}' and trashed=false`);
   const res = await driveRequest(
     `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`
   );
@@ -137,6 +139,55 @@ export async function saveTransactions(transactions) {
     );
   } else {
     // 새 파일 생성
+    await driveRequest(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      { method: 'POST', body: form }
+    );
+  }
+}
+
+// Drive에서 예산 불러오기. 파일이 없으면 null, 손상된 파일이면 에러를 그대로 던진다
+export async function loadBudgets() {
+  await ensureToken();
+  const fileId = await findFileId(BUDGET_FILE_NAME);
+  if (!fileId) return null;
+
+  const res = await driveRequest(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
+  );
+  const text = await res.text(); // 다운로드 단계 오류는 변환하지 않고 그대로 전파
+  // 본문 파싱·검증 실패만 BudgetFileCorruptError 로 변환
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new BudgetFileCorruptError('예산 파일을 읽을 수 없습니다: JSON 형식이 아닙니다');
+  }
+  try {
+    return parseBudgets(raw);
+  } catch (e) {
+    throw new BudgetFileCorruptError(e?.message || undefined);
+  }
+}
+
+// Drive에 예산 저장 (없으면 생성, 있으면 덮어쓰기)
+export async function saveBudgets(budgets) {
+  await ensureToken();
+  const fileId = await findFileId(BUDGET_FILE_NAME);
+
+  const metadata = { name: BUDGET_FILE_NAME, mimeType: 'application/json' };
+  const blob = new Blob([JSON.stringify(budgets)], { type: 'application/json' });
+
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', blob);
+
+  if (fileId) {
+    await driveRequest(
+      `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+      { method: 'PATCH', body: form }
+    );
+  } else {
     await driveRequest(
       'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
       { method: 'POST', body: form }

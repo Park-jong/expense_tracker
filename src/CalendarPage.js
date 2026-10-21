@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { formatKRW, today, parseMonth, shiftMonth } from './utils';
+import { formatKRW, compactKRW, today, parseMonth, shiftMonth } from './utils';
 
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -87,13 +87,28 @@ export default function CalendarPage({ transactions, month, onMonthChange }) {
               onClick={() => setSelectedDate(day === selectedDate ? null : day)}
             >
               <span className="cal-day-num">{day}</span>
+              {/* 합계 span 의 aria-label 이 전체 금액을 전달하고, 안쪽 표기 span 은 시각용 */}
               {data && (
                 <div className="cal-amounts">
                   {data.income > 0 && (
-                    <span className="cal-income">+{formatKRW(data.income)}</span>
+                    <span
+                      className="cal-income"
+                      title={`수입 ${formatKRW(data.income)}`}
+                      aria-label={`수입 ${formatKRW(data.income)}`}
+                    >
+                      <span className="cal-amt-full" aria-hidden="true">+{formatKRW(data.income)}</span>
+                      <span className="cal-amt-compact" aria-hidden="true">+{compactKRW(data.income)}</span>
+                    </span>
                   )}
                   {data.expense > 0 && (
-                    <span className="cal-expense">-{formatKRW(data.expense)}</span>
+                    <span
+                      className="cal-expense"
+                      title={`지출 ${formatKRW(data.expense)}`}
+                      aria-label={`지출 ${formatKRW(data.expense)}`}
+                    >
+                      <span className="cal-amt-full" aria-hidden="true">-{formatKRW(data.expense)}</span>
+                      <span className="cal-amt-compact" aria-hidden="true">-{compactKRW(data.expense)}</span>
+                    </span>
                   )}
                 </div>
               )}

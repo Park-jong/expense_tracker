@@ -318,3 +318,60 @@ test('(xv) month-picker 를 비워도 목록과 달력이 직전 월을 유지�
   expect(screen.getByText('2026년 3월')).toBeInTheDocument();
   await screen.findByText('이 기기에만 저장됨');
 });
+
+describe('월 예산 통합', () => {
+  const BUDGET_KEY = 'guest_budgets';
+  const seedBudget = (total, categories) =>
+    localStorage.setItem(BUDGET_KEY, JSON.stringify({ version: 1, total, categories }));
+
+  test('목록 탭 예산 알림이 선택 월 기준으로 표시된다', async () => {
+    localStorage.setItem(GUEST_KEY, JSON.stringify([
+      { ...monthTx(1, '2026-03-10', '삼월 식사'), amount: 112000 },
+      { ...monthTx(2, '2026-04-10', '사월 식사'), amount: 1000 },
+    ]));
+    seedBudget(null, { 식비: 100000 });
+    render(<App />);
+    setMonth('2026-03');
+    expect(await screen.findByLabelText('예산 알림')).toHaveTextContent('⛔ 식비 예산 초과 · 12,000원 더 사용');
+
+    setMonth('2026-04');
+    expect(screen.queryByLabelText('예산 알림')).not.toBeInTheDocument();
+    await screen.findByText('이 기기에만 저장됨');
+  });
+
+  test('통계 탭 월 예산 패널에 meter 가 표시된다', async () => {
+    localStorage.setItem(GUEST_KEY, JSON.stringify([{ ...monthTx(1, '2026-03-10', '식사'), amount: 87500 }]));
+    seedBudget(null, { 식비: 100000 });
+    render(<App />);
+    setMonth('2026-03');
+    fireEvent.click(screen.getByRole('button', { name: '통계' }));
+    expect(screen.getByRole('heading', { name: '월 예산' })).toBeInTheDocument();
+    expect(screen.getByRole('meter')).toHaveAttribute(
+      'aria-label',
+      '식비 예산, 사용 87,500원 / 예산 100,000원, 87.5%'
+    );
+    await waitFor(() => expect(screen.getAllByText('이 기기에만 저장됨').length).toBeGreaterThan(0));
+  });
+
+  test('통계 탭에서 예산을 설정하면 localStorage 에 저장되고 목록 알림이 갱신된다', async () => {
+    localStorage.setItem(GUEST_KEY, JSON.stringify([{ ...monthTx(1, '2026-03-10', '식사'), amount: 9000 }]));
+    render(<App />);
+    setMonth('2026-03');
+    await screen.findByText('이 기기에만 저장됨'); // 인증 초기화(예산 loading) 종료 대기
+    expect(screen.queryByLabelText('예산 알림')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '통계' }));
+    fireEvent.click(screen.getByRole('button', { name: '예산 설정' }));
+    fireEvent.change(screen.getByLabelText('식비'), { target: { value: '10000' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem(BUDGET_KEY))).toEqual({
+        version: 1, total: null, categories: { 식비: 10000 },
+      })
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '목록' }));
+    expect(screen.getByLabelText('예산 알림')).toHaveTextContent('⚠ 식비 예산 주의 · 90% 사용');
+  });
+});
