@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { CATEGORIES } from './categories';
 import { formatKRW, today, monthOfDate, filterTransactions } from './utils';
 import BudgetAlerts from './BudgetAlerts';
+import RecurringPanel from './RecurringPanel';
 import { buildExportFile, parseImportText, planImport, isValidImportRow } from './csvTransfer';
 
 const UNDO_MS = 6000; // 삭제 실행 취소 알림 표시 시간
@@ -20,7 +21,7 @@ const emptyForm = () => ({
   amount: '',
 });
 
-export default function ListPage({ transactions, onAdd, onEdit, onDelete, onRestore, onImport, importDisabled = false, filterMonth, onFilterMonthChange, budgetApi }) {
+export default function ListPage({ transactions, onAdd, onEdit, onDelete, onRestore, onImport, importDisabled = false, filterMonth, onFilterMonthChange, budgetApi, recurringApi, recurringNotice, onDismissRecurringNotice, authState }) {
   const fileInput = useRef(null);
   const [importMsg, setImportMsg] = useState(null); // { kind: 'error' | 'status', text }
   const [form, setForm] = useState(emptyForm);
@@ -369,6 +370,8 @@ export default function ListPage({ transactions, onAdd, onEdit, onDelete, onRest
             ))
         )}
       </section>
+
+      <RecurringPanel recurringApi={recurringApi} notice={recurringNotice} onDismissNotice={onDismissRecurringNotice} authState={authState} />
 
       {deleted && (
         <div className="undo-bar" role="status">

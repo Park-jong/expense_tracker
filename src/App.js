@@ -7,6 +7,8 @@ import { initAuth, signIn, signOut, isSignedIn, loadTransactions, saveTransactio
 import { today, parseMonth } from './utils';
 import { planImport } from './csvTransfer';
 import { useBudgets } from './useBudgets';
+import { useRecurring } from './useRecurring';
+import { planGeneration, applyDrafts, draftKeys, isGenerationSaved, txKey } from './recurring';
 import useTheme from './useTheme';
 import ThemeSelect from './ThemeSelect';
 import { loadGuestTransactions, saveGuestTransactions, clearGuestTransactions, mergeTransactions } from './guestStorage';
@@ -24,6 +26,8 @@ export default function App() {
   const loadGen = useRef(0); // 불러오기 요청 세대 (오래된 응답 무효화용)
   const transactionsRef = useRef(transactions); // 최신 거래 목록 (비동기 콜백에서 참조)
   transactionsRef.current = transactions;
+  const savedQueue = useRef([]); // Drive 저장에 성공한 거래 배열들(반복 거래 생성 effect 가 소비)
+  const [savedSeq, setSavedSeq] = useState(0); // 저장 성공 시마다 증가해 생성 effect 를 깨움
   const guestPending = useRef(false); // 게스트 데이터가 Drive에 아직 저장되지 않았는지 여부
 
   // Drive에서 불러오기. 성공(파일 없음 포함)한 경우에만 자동 저장을 활성화해
@@ -116,6 +120,8 @@ export default function App() {
           guestPending.current = false;
         }
         setSyncState('saved');
+        savedQueue.current.push(transactions); // 저장 성공 신호: 이 저장에 쓰인 거래 배열 기록
+        setSavedSeq((n) => n + 1);
       } catch {
         if (gen !== loadGen.current) return;
         setSyncState('error');
@@ -126,6 +132,65 @@ export default function App() {
   }, [transactions]);
 
   const budgetApi = useBudgets(authState);
+  const recurringApi = useRecurring(authState);
+  const [recurringNotice, setRecurringNotice] = useState(null);
+  const pendingGen = useRef(null); // 로그인 모드: 생성 거래가 Drive 에 저장되기 전까지 규칙의 lastGenerated 반영을 보류 { updates, keys }
+
+  // 알림은 8초 뒤 자동으로 사라진다(언마운트 시 타이머 정리)
+  useEffect(() => {
+    if (!recurringNotice) return;
+    const t = setTimeout(() => setRecurringNotice(null), 8000);
+    return () => clearTimeout(t);
+  }, [recurringNotice]);
+
+  // 인증 초기화가 시작되기 전(첫 렌더의 'idle')에는 비로그인으로 오인해 거래를 만들지 않기 위한 표시
+  const [authBooted, setAuthBooted] = useState(false);
+  useEffect(() => {
+    if (authState !== 'idle') setAuthBooted(true);
+  }, [authState]);
+
+  // 반복 거래 자동 생성. 거래와 반복 규칙 불러오기가 모두 성공한 뒤에만 실행한다(실패 시 생성·저장 없음).
+  // lastGenerated 가 앞서 있어 삭제한 거래는 되살아나지 않고, 같은 내용의 거래가 있으면 건너뛰어 중복을 막는다.
+  const { rules, ready: rulesReady, markGenerated } = recurringApi;
+  useEffect(() => {
+    const guestMode = authState === 'idle' || authState === 'error';
+    const txReady = authBooted && (guestMode || (authState === 'signed-in' && isLoaded.current && !loadFailed));
+    // 성공 신호 큐는 실행마다 비워 누적을 막는다(규칙 로드 실패 등으로 아래에서 일찍 반환해도 쌓이지 않음). 최근 5개만 판정에 쓴다.
+    const successes = savedQueue.current.slice(-5);
+    savedQueue.current = [];
+    if (!txReady || !rulesReady) {
+      pendingGen.current = null; // 세션·불러오기 상태가 바뀌면 보류분 폐기(다음 로드 때 재생성, 내용 중복 검사로 중복 없음)
+      return;
+    }
+    // 로그인 모드: 저장 성공 신호(savedQueue)가 온 뒤에만 판단한다. 성공한 저장 배열에 생성하려던 내용 키가 모두 있으면
+    // (그 사이 사용자가 삭제·수정해 현재 목록에 없는 키는 충족으로 간주) 규칙을 저장한다. id 는 쓰지 않는다.
+    // 저장 실패는 신호가 없으므로 보류를 유지하고 다음 성공 저장에서 다시 판정한다.
+    const pending = pendingGen.current;
+    if (pending) {
+      const current = transactionsRef.current;
+      const done = successes.some((arr) => isGenerationSaved(pending.keys, arr, current));
+      if (done) {
+        pendingGen.current = null;
+        markGenerated(pending.updates);
+      }
+      return;
+    }
+    const { drafts, updates, skipped } = planGeneration(rules, today());
+    if (Object.keys(updates).length === 0) return;
+    const nowMs = Date.now(); // 업데이터 밖에서 한 번만 읽음
+    const base = transactionsRef.current;
+    const added = applyDrafts(base, drafts, nowMs).length - base.length; // 알림 표시용 건수
+    setTransactions((prev) => applyDrafts(prev, drafts, nowMs)); // 순수 업데이터
+    const baseKeys = new Set(base.map(txKey)); // 이미 있는 내용은 저장을 기다릴 필요 없음
+    const keys = draftKeys(drafts).filter((k) => !baseKeys.has(k));
+    if (authState === 'signed-in' && keys.length > 0) {
+      pendingGen.current = { updates, keys }; // 같은 내용의 거래가 담긴 저장 성공을 기다림
+    } else markGenerated(updates); // 게스트(동기 저장)이거나 새로 추가된 거래가 없으면 바로 반영
+    const parts = [];
+    if (added > 0) parts.push(`반복 거래 ${added}건을 자동으로 등록했습니다.`);
+    if (skipped > 0) parts.push(`오래된 ${skipped}건은 한 번에 만들 수 있는 상한(규칙당 366건)을 넘어 등록하지 않았습니다.`);
+    if (parts.length > 0) setRecurringNotice(parts.join(' '));
+  }, [authState, authBooted, syncState, savedSeq, loadFailed, rulesReady, rules, markGenerated]);
 
   const handleAdd = (data) => {
     setTransactions((prev) => [...prev, { id: Date.now(), ...data }]);
@@ -208,6 +273,10 @@ export default function App() {
           filterMonth={filterMonth}
           onFilterMonthChange={setFilterMonth}
           budgetApi={budgetApi}
+          recurringApi={recurringApi}
+          recurringNotice={recurringNotice}
+          onDismissRecurringNotice={() => setRecurringNotice(null)}
+          authState={authState}
         />
       )}
 

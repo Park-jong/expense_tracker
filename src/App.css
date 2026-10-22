@@ -1412,3 +1412,126 @@ body {
 @media (max-width: 480px) {
   .budget-form { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── 반복 거래 패널 (색은 기존 테마 변수만 사용) ── */
+.recurring-panel { margin: 20px 0; }
+
+.recurring-notice {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-left: 4px solid var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.recurring-notice-row { display: flex; align-items: flex-start; gap: 6px; margin: 0 0 10px; }
+.recurring-notice-row .recurring-notice { flex: 1; min-width: 0; margin: 0; }
+.recurring-notice-close {
+  flex-shrink: 0;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text);
+  border-radius: 6px;
+  min-width: 32px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.recurring-help { margin: 0 0 10px; overflow-wrap: anywhere; }
+
+.recurring-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recurring-item {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.recurring-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.recurring-desc {
+  font-weight: 600;
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.recurring-amount { font-weight: 700; flex-shrink: 0; white-space: nowrap; text-align: right; }
+.recurring-amount.income { color: var(--income-text); }
+.recurring-amount.expense { color: var(--expense-text); }
+
+.recurring-meta {
+  margin: 2px 0 6px;
+  font-size: 0.8rem;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.recurring-actions { display: flex; gap: 6px; }
+
+.recurring-add { margin-top: 4px; }
+
+.recurring-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 8px 0 0;
+}
+
+.recurring-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.recurring-wide { grid-column: 1 / -1; }
+
+.recurring-field label {
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+
+.recurring-field input,
+.recurring-field select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border-soft);
+  background: var(--input-bg);
+  color: var(--text);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.recurring-errors {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0 0 0 18px;
+  font-size: 0.8rem;
+  color: var(--error-text);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .recurring-form { grid-template-columns: minmax(0, 1fr); }
+  /* 좁은 화면: 금액을 설명 아래 줄로 내려 설명이 전체 폭을 쓰게 한다 */
+  .recurring-main { flex-direction: column; gap: 2px; }
+  .recurring-amount { text-align: left; white-space: normal; overflow-wrap: anywhere; }
+}
