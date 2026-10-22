@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { CATEGORIES } from './categories';
 import { formatKRW, today, monthOfDate, filterTransactions } from './utils';
 import BudgetAlerts from './BudgetAlerts';
+import { buildExportFile, parseImportText, planImport, isValidImportRow } from './csvTransfer';
 
 const UNDO_MS = 6000; // 삭제 실행 취소 알림 표시 시간
 
@@ -19,7 +20,9 @@ const emptyForm = () => ({
   amount: '',
 });
 
-export default function ListPage({ transactions, onAdd, onEdit, onDelete, onRestore, filterMonth, onFilterMonthChange, budgetApi }) {
+export default function ListPage({ transactions, onAdd, onEdit, onDelete, onRestore, onImport, importDisabled = false, filterMonth, onFilterMonthChange, budgetApi }) {
+  const fileInput = useRef(null);
+  const [importMsg, setImportMsg] = useState(null); // { kind: 'error' | 'status', text }
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null); // 수정 중인 거래 id (null이면 추가 모드)
@@ -65,6 +68,60 @@ export default function ListPage({ transactions, onAdd, onEdit, onDelete, onRest
     clearTimeout(undoTimer.current);
     if (deleted) onRestore(deleted);
     setDeleted(null);
+  };
+
+  // 현재 로드된 전체 거래(월/필터 무관)를 BOM 포함 CSV로 다운로드
+  const handleExport = () => {
+    const { filename, content } = buildExportFile(transactions);
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const readFileText = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ''));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file, 'UTF-8');
+    });
+
+  const handleImportFile = async (e) => {
+    const input = e.target;
+    const file = input.files && input.files[0];
+    if (!file) return;
+    setImportMsg(null);
+    try {
+      const text = await readFileText(file);
+      const rows = parseImportText(text);
+      const { toAdd, duplicates, invalid } = planImport(transactions, rows);
+      if (toAdd.length === 0) {
+        const detail = invalid + duplicates > 0 ? ` (중복 ${duplicates}건, 잘못된 행 ${invalid}건 제외)` : '';
+        setImportMsg({ kind: 'error', text: `가져올 수 있는 거래가 없습니다${detail}.` });
+      } else {
+        const msg =
+          `${toAdd.length}건 추가, ${duplicates}건 중복 제외` +
+          (invalid > 0 ? `, ${invalid}건 잘못된 행 건너뜀` : '') +
+          '\n(내용이 같은 거래는 중복으로 제외)' +
+          '\n가져오시겠습니까?';
+        if (window.confirm(msg)) {
+          onImport(rows.filter(isValidImportRow)); // 최종 반영은 App에서 최신 상태 기준으로 다시 계산
+          setImportMsg({
+            kind: 'status',
+            text: `${toAdd.length}건을 가져왔습니다. (중복 ${duplicates}건, 잘못된 행 ${invalid}건 제외)`,
+          });
+        }
+      }
+    } catch {
+      setImportMsg({ kind: 'error', text: 'CSV 파일을 읽을 수 없습니다. 형식을 확인해 주세요.' });
+    } finally {
+      input.value = ''; // 같은 파일을 다시 선택할 수 있도록 초기화
+    }
   };
 
   // 해당 월 전체 거래 (요약 카드는 필터와 무관)
@@ -156,7 +213,33 @@ export default function ListPage({ transactions, onAdd, onEdit, onDelete, onRest
         <button className="btn-add" onClick={handleToggleForm}>
           {showForm ? '취소' : '+ 거래 추가'}
         </button>
+        <button type="button" className="btn-transfer" onClick={handleExport} disabled={transactions.length === 0}>
+          CSV 내보내기
+        </button>
+        <button
+          type="button"
+          className="btn-transfer"
+          onClick={() => fileInput.current && fileInput.current.click()}
+          disabled={importDisabled || !onImport}
+        >
+          CSV 가져오기
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".csv,text/csv"
+          aria-label="CSV 파일 선택"
+          data-testid="csv-file-input"
+          hidden
+          onChange={handleImportFile}
+        />
       </div>
+
+      {importMsg && (
+        <p className={`import-msg ${importMsg.kind}`} role={importMsg.kind === 'error' ? 'alert' : 'status'}>
+          {importMsg.text}
+        </p>
+      )}
 
       {showForm && (
         <form className="form" onSubmit={handleSubmit}>

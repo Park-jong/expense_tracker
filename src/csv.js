@@ -76,6 +76,18 @@ function splitRows(text) {
   return rows;
 }
 
+// 가져오기용: 값 검증 없이 헤더를 포함한 모든 원시 필드 배열을 반환 (헤더 판별은 호출하는 쪽에서 함)
+export function readCSVRows(text) {
+  const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  const rows = splitRows(src);
+  while (rows.length > 0) {
+    const last = rows[rows.length - 1];
+    if (last.length === 1 && last[0] === '') rows.pop();
+    else break;
+  }
+  return rows;
+}
+
 // 행 번호(n)는 헤더를 1번으로 센 파일 기준
 export function parseCSV(text) {
   const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text; // BOM 제거

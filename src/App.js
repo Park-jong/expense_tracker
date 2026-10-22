@@ -5,11 +5,15 @@ import CalendarPage from './CalendarPage';
 import StatsPage from './StatsPage';
 import { initAuth, signIn, signOut, isSignedIn, loadTransactions, saveTransactions } from './googleDrive';
 import { today, parseMonth } from './utils';
+import { planImport } from './csvTransfer';
 import { useBudgets } from './useBudgets';
+import useTheme from './useTheme';
+import ThemeSelect from './ThemeSelect';
 import { loadGuestTransactions, saveGuestTransactions, clearGuestTransactions, mergeTransactions } from './guestStorage';
 
 export default function App() {
   const [transactions, setTransactions] = useState(() => loadGuestTransactions());
+  const [theme, setTheme] = useTheme();
   const [tab, setTab] = useState('list');
   const [filterMonth, setFilterMonth] = useState(today().slice(0, 7));
 
@@ -137,6 +141,15 @@ export default function App() {
     setTransactions((prev) => (prev.some((t) => t.id === tx.id) ? prev : [...prev, tx]));
   };
 
+  // CSV 가져오기: 검증된 원시 행을 받아 최신 상태(prev) 기준으로 중복 제외·id 부여 후 뒤에 추가
+  // planImport 는 순수 함수라 StrictMode 이중 호출에도 같은 결과를 낸다
+  const handleImport = (rows) => {
+    setTransactions((prev) => {
+      const { toAdd } = planImport(prev, rows);
+      return toAdd.length === 0 ? prev : [...prev, ...toAdd];
+    });
+  };
+
   const handleDelete = (id) => {
     setTransactions((prev) => prev.filter((t) => t.id !== id));
   };
@@ -159,6 +172,7 @@ export default function App() {
               className="month-picker"
             />
           )}
+          <ThemeSelect theme={theme} onChange={setTheme} />
           <AuthButton
             authState={authState}
             syncState={syncState}
@@ -189,6 +203,8 @@ export default function App() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onRestore={handleRestore}
+          onImport={handleImport}
+          importDisabled={loadFailed}
           filterMonth={filterMonth}
           onFilterMonthChange={setFilterMonth}
           budgetApi={budgetApi}

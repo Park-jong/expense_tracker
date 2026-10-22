@@ -375,3 +375,25 @@ describe('월 예산 통합', () => {
     expect(screen.getByLabelText('예산 알림')).toHaveTextContent('⚠ 식비 예산 주의 · 90% 사용');
   });
 });
+
+test('(xvii) CSV 가져오기: 헤더 없는 파일도 읽고, 내용이 같은 거래는 id가 달라도 제외하며 id 충돌은 새 id로 저장한다', async () => {
+  localStorage.setItem(GUEST_KEY, JSON.stringify([tx(1, '점심', 8000)]));
+  jest.spyOn(window, 'confirm').mockReturnValue(true);
+  render(<App />);
+  expect(await screen.findByText('점심')).toBeInTheDocument();
+
+  const d = today();
+  const text = `7,${d},expense,식비,점심,8000\n1,${d},expense,식비,저녁,9000\n`; // 헤더 없음
+  fireEvent.change(screen.getByTestId('csv-file-input'), {
+    target: { files: [new File([text], 'in.csv', { type: 'text/csv' })] },
+  });
+
+  expect(await screen.findByText('저녁')).toBeInTheDocument();
+  await waitFor(() => {
+    const saved = readGuest();
+    expect(saved).toHaveLength(2);
+    expect(new Set(saved.map((t) => t.id)).size).toBe(2);
+    expect(saved.find((t) => t.description === '저녁').id).toBe(2);
+  }, WAIT);
+  window.confirm.mockRestore();
+});

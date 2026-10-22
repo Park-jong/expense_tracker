@@ -4,7 +4,23 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f0f2f5" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#12141c" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      // 깜빡임 방지: React 마운트 전에 저장된 테마를 적용 (접근 실패는 무시)
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t);
+          // 시스템과 다른 테마를 직접 고른 경우 theme-color 도 선택한 테마 배경으로 맞춘다
+          var m = document.querySelectorAll('meta[name="theme-color"]');
+          for (var i = 0; i < m.length; i++) {
+            m[i].setAttribute('content', t === 'dark' ? '#12141c' : '#f0f2f5');
+          }
+        }
+      } catch (e) {}
+    </script>
     <meta
       name="description"
       content="Web site created using create-react-app"

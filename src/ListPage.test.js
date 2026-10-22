@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ListPage from './ListPage';
 import { today } from './utils';
@@ -253,4 +253,90 @@ test('월을 바꿔도 필터 조건은 유지된다', () => {
   fireEvent.change(typeFilter(), { target: { value: 'income' } });
   rerender(<ListPage {...props} filterMonth="2000-01" />);
   expect(typeFilter()).toHaveValue('income');
+});
+
+describe('CSV 내보내기/가져오기', () => {
+  const csvFile = (text, name = 'in.csv') => new File([text], name, { type: 'text/csv' });
+  const header = 'id,date,type,category,description,amount\n';
+  const pick = (file) => fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [file] } });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    delete URL.createObjectURL;
+    delete URL.revokeObjectURL;
+  });
+
+  test('내보내기는 전체 거래를 BOM 포함 Blob으로 다운로드하고 URL을 해제한다', async () => {
+    let blob;
+    URL.createObjectURL = jest.fn((b) => { blob = b; return 'blob:x'; });
+    URL.revokeObjectURL = jest.fn();
+    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    // 다른 달 거래도 포함되어야 한다
+    setup({ transactions: [sample, { ...sample, id: 12, date: '2020-01-01', description: '옛날' }], onImport: jest.fn() });
+    fireEvent.click(screen.getByRole('button', { name: 'CSV 내보내기' }));
+
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:x');
+    const bytes = await new Promise((res) => {
+      const r = new FileReader();
+      r.onload = () => res(new Uint8Array(r.result));
+      r.readAsArrayBuffer(blob);
+    });
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    const text = Buffer.from(bytes).toString('utf8');
+    expect(text).toContain('옛날');
+    expect(text).toContain('점심 식사');
+  });
+
+  test('거래가 없으면 내보내기 버튼이 비활성화된다', () => {
+    setup({ transactions: [], onImport: jest.fn() });
+    expect(screen.getByRole('button', { name: 'CSV 내보내기' })).toBeDisabled();
+  });
+
+  test('가져오기: 확인하면 유효한 행을 onImport로 전달하고 결과를 안내한다', async () => {
+    const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const onImport = jest.fn();
+    setup({ onImport });
+    const text = header +
+      `11,${sample.date},expense,교통,점심 식사,8000\n` +
+      `12,${sample.date},income,급여,월급,1000\n` +
+      `13,${sample.date},income,급여,오류,abc\n`;
+    pick(csvFile('\uFEFF' + text));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('1건을 가져왔습니다');
+    expect(confirm.mock.calls[0][0]).toContain('1건 추가, 1건 중복 제외');
+    expect(confirm.mock.calls[0][0]).toContain('1건 잘못된 행');
+    expect(confirm.mock.calls[0][0]).toContain('내용이 같은 거래는 중복으로 제외');
+    expect(onImport).toHaveBeenCalledTimes(1);
+    // 유효한 원시 행 전체를 넘기고 중복 제외는 App(prev 기준)에서 처리한다
+    expect(onImport.mock.calls[0][0]).toHaveLength(2);
+    expect(onImport.mock.calls[0][0][1]).toEqual({ id: '12', date: sample.date, type: 'income', category: '급여', description: '월급', amount: '1000' });
+  });
+
+  test('가져오기: 취소하면 반영하지 않는다', async () => {
+    const confirm = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    const onImport = jest.fn();
+    setup({ onImport });
+    pick(csvFile(header + `12,${sample.date},income,급여,월급,1000\n`));
+    await waitFor(() => expect(confirm).toHaveBeenCalled());
+    expect(onImport).not.toHaveBeenCalled();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  test('가져오기: 빈 파일이나 형식 오류는 오류 메시지를 보이고 반영하지 않는다', async () => {
+    const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const onImport = jest.fn();
+    setup({ onImport });
+    pick(csvFile(header));
+    expect(await screen.findByRole('alert')).toHaveTextContent('가져올 수 있는 거래가 없습니다');
+    pick(csvFile('a,"b\n'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('읽을 수 없습니다'));
+    expect(confirm).not.toHaveBeenCalled();
+    expect(onImport).not.toHaveBeenCalled();
+  });
+
+  test('불러오기 실패 상태(importDisabled)에서는 가져오기 버튼이 비활성화된다', () => {
+    setup({ onImport: jest.fn(), importDisabled: true });
+    expect(screen.getByRole('button', { name: 'CSV 가져오기' })).toBeDisabled();
+  });
 });
